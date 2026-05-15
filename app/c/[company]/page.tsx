@@ -2,7 +2,9 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Header } from "@/components/header";
 import { BundleList } from "@/components/bundle-list";
+import { AnalyticsSummaryWidget } from "@/components/analytics-summary";
 import { loadCurrentWeekCalendar } from "@/lib/calendar";
+import { loadAnalyticsSummary } from "@/lib/status";
 
 export const dynamic = "force-dynamic";
 
@@ -35,6 +37,14 @@ export default async function CompanyHomePage({
   const reelCount = calendar?.bundles.filter((b) => b.needs_reel).length ?? 0;
   const total = calendar?.bundles.length ?? 0;
 
+  // Analytics is optional context — never fail the page if the loader throws.
+  let analyticsSummary = null;
+  try {
+    analyticsSummary = await loadAnalyticsSummary(company);
+  } catch {
+    // Widget will render the cold-start fallback.
+  }
+
   return (
     <>
       <Header company={company} />
@@ -44,12 +54,20 @@ export default async function CompanyHomePage({
             <p className="text-xs uppercase tracking-[0.18em] text-ink-400">
               week of {weekStart || "—"}
             </p>
-            <Link
-              href="/companies"
-              className="text-xs text-ink-400 hover:text-ink-200 transition-colors"
-            >
-              switch company
-            </Link>
+            <div className="flex items-center gap-4">
+              <Link
+                href={`/c/${company}/runs`}
+                className="text-xs text-ink-400 hover:text-ink-200 transition-colors"
+              >
+                view all runs
+              </Link>
+              <Link
+                href="/companies"
+                className="text-xs text-ink-400 hover:text-ink-200 transition-colors"
+              >
+                switch company
+              </Link>
+            </div>
           </div>
           <h1 className="text-3xl text-ink-50 font-semibold tracking-tight mb-1">
             {company}
@@ -81,6 +99,8 @@ export default async function CompanyHomePage({
           ) : (
             <EmptyState weekStart={weekStart} />
           )}
+
+          <AnalyticsSummaryWidget summary={analyticsSummary} />
         </div>
       </main>
     </>
