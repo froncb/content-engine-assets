@@ -59,6 +59,76 @@ export const ContentCalendarSchema = z
 
 export type ContentCalendar = z.infer<typeof ContentCalendarSchema>;
 
+/**
+ * Engine R2 contract — runs-index, bundle status, analytics summary.
+ * See content-engine plan §3.1. Schema mismatches throw at load time.
+ */
+
+export const RunsIndexEntrySchema = z.object({
+  bundle_id: z.string(),
+  date: z.string(),
+  pillar: z.string().optional(),
+  stage: z.enum(["PRODUCED", "PUBLISHED", "MONITORED", "CLOSED", "FAILED"]).default("PRODUCED"),
+  last_updated: z.string().optional(),
+});
+export type RunsIndexEntry = z.infer<typeof RunsIndexEntrySchema>;
+
+export const RunsIndexSchema = z.object({
+  runs: z.array(RunsIndexEntrySchema),
+});
+export type RunsIndex = z.infer<typeof RunsIndexSchema>;
+
+const PlatformStatusSchema = z.object({
+  state: z.enum(["pending", "scheduled", "posted", "failed", "skipped"]),
+  late_post_id: z.string().nullable(),
+  scheduled_for: z.string().nullable(),
+  error: z.string().nullable(),
+});
+
+export const BundleStatusSchema = z.object({
+  schema_version: z.literal(1),
+  bundle_id: z.string(),
+  stage: z.enum(["PRODUCED", "PUBLISHED", "MONITORED", "CLOSED", "FAILED"]),
+  needs_reel: z.boolean(),
+  reel_source: z.enum(["filmed", "vo"]).nullable(),
+  footage_available: z.boolean(),
+  transcript_available: z.boolean(),
+  platforms: z.object({
+    instagram_carousel: PlatformStatusSchema,
+    tiktok_carousel: PlatformStatusSchema,
+    instagram_reel: PlatformStatusSchema,
+    tiktok_video: PlatformStatusSchema,
+    linkedin: PlatformStatusSchema,
+    twitter: PlatformStatusSchema,
+  }),
+  quality_gates: z.object({
+    reel_video: z.enum(["pass", "fail", "na"]),
+    reel_caption: z.enum(["pass", "fail", "na"]),
+    carousel_html: z.enum(["pass", "fail", "na"]),
+    carousel_copy: z.enum(["pass", "fail", "na"]),
+    linkedin: z.enum(["pass", "fail", "na"]),
+    twitter: z.enum(["pass", "fail", "na"]),
+  }),
+  warnings: z.array(z.string()).default([]),
+  last_updated: z.string(),
+});
+export type BundleStatus = z.infer<typeof BundleStatusSchema>;
+
+export const AnalyticsTopPostSchema = z.object({
+  bundle_id: z.string(),
+  platform: z.string(),
+  pillar: z.string().optional(),
+  engagement_score: z.number(),
+  late_post_url: z.string().optional(),
+});
+export type AnalyticsTopPost = z.infer<typeof AnalyticsTopPostSchema>;
+
+export const AnalyticsSummarySchema = z.object({
+  last_analytics_run: z.string().nullable(),
+  top_posts_14d: z.array(AnalyticsTopPostSchema).default([]),
+});
+export type AnalyticsSummary = z.infer<typeof AnalyticsSummarySchema>;
+
 /** Helper — checks the post-Phase-1 reel invariants the hub depends on. */
 export function reelInvariantErrors(calendar: ContentCalendar): string[] {
   const errors: string[] = [];
