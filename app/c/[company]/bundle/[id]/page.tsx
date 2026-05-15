@@ -5,6 +5,9 @@ import { FilmingScriptViewer } from "@/components/filming-script-viewer";
 import { UploadZone } from "@/components/upload-zone";
 import { findBundle, isoMonday, loadCalendar, dayName, todayInPT } from "@/lib/calendar";
 import { getFootageStatus } from "@/lib/footage";
+import { loadBundleStatus } from "@/lib/status";
+import { PlatformBadge } from "@/components/platform-badge";
+import { QualityGateAccordion } from "@/components/quality-gate-accordion";
 
 export const dynamic = "force-dynamic";
 
@@ -52,6 +55,14 @@ export default async function BundleDetailPage({
   const footage = bundle.needs_reel
     ? await getFootageStatus(company, bundle.id)
     : { uploaded: false, ext: null, publicUrl: null };
+
+  let bundleStatus = null;
+  let statusError: string | null = null;
+  try {
+    bundleStatus = await loadBundleStatus(company, bundle.id);
+  } catch (e) {
+    statusError = e instanceof Error ? e.message : String(e);
+  }
 
   const scheduledForLabel = `${dayName(bundle.date)} ${bundle.date} at ${bundle.target_time}`;
 
@@ -168,6 +179,66 @@ export default async function BundleDetailPage({
                 );
               })}
             </ul>
+          </section>
+
+          {/* Bundle status — from R2 status.json, populated by engine post-/run-daily */}
+          <section>
+            <p className="text-xs uppercase tracking-[0.18em] text-ink-400 mb-3">bundle status</p>
+            {statusError ? (
+              <div className="rounded-md border border-red-500/40 bg-red-500/5 px-4 py-3 text-sm text-red-300">
+                <p className="font-medium mb-1">Couldn&apos;t load status</p>
+                <p className="text-xs text-red-300/80 break-words">{statusError}</p>
+              </div>
+            ) : !bundleStatus ? (
+              <p className="text-sm text-ink-400">
+                Status not yet published to R2 for this bundle. After the next{" "}
+                <code>/run-daily</code> for this date, the engine will push status.json
+                and it will appear here.
+              </p>
+            ) : (
+              <>
+                <div className="rounded-md border border-ink-800 px-4 py-2">
+                  {(
+                    Object.entries(bundleStatus.platforms) as Array<
+                      [
+                        keyof typeof bundleStatus.platforms,
+                        (typeof bundleStatus.platforms)[keyof typeof bundleStatus.platforms],
+                      ]
+                    >
+                  ).map(([platform, p]) => (
+                    <PlatformBadge
+                      key={platform}
+                      platform={platform}
+                      state={p.state}
+                      latePostId={p.late_post_id}
+                      scheduledFor={p.scheduled_for}
+                      error={p.error}
+                    />
+                  ))}
+                </div>
+
+                <div className="mt-4 text-xs text-ink-500">
+                  <span>
+                    Stage: <span className="text-ink-200">{bundleStatus.stage}</span>
+                  </span>
+                  {bundleStatus.reel_source && (
+                    <span className="ml-4">
+                      Reel source:{" "}
+                      <span className="text-ink-200">{bundleStatus.reel_source}</span>
+                    </span>
+                  )}
+                  {bundleStatus.warnings.length > 0 && (
+                    <div className="mt-2 text-amber-300">
+                      {bundleStatus.warnings.map((w, i) => (
+                        <p key={i}>⚠ {w}</p>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                <QualityGateAccordion gates={bundleStatus.quality_gates} />
+              </>
+            )}
           </section>
 
           <section className="border-t border-ink-800 pt-6">
